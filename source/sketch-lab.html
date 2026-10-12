@@ -1,0 +1,1177 @@
+<title>Sketch Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Source+Serif+4:ital,opsz,wght@1,8..60,400&display=swap">
+<style>
+/* Layout: one instrument column. Terminal chrome around a sheet of cream paper; the paper is the only light object. */
+:root {
+  --bg: #100f0d;          /* graphite-black ground */
+  --panel: #191815;       /* instrument panels */
+  --line: #2b2925;        /* hairlines */
+  --line-hi: #4a463e;
+  --fg: #ddd7c9;          /* primary text */
+  --muted: #8f897b;       /* labels */
+  --dim: #5f5a50;         /* comments */
+  --paper: #ece4d3;       /* the drawing sheet */
+  --ink: #1c1a18;         /* graphite */
+  --st-idle: #5f5a50; --st-analyse: #38a6d6; --st-draw: #d98a1a; --st-done: #3fa35f; --st-err: #d4483b;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --serif: "Source Serif 4", "Source Serif Pro", Georgia, "Times New Roman", serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { background: var(--bg); }
+body { color: var(--fg); font-family: var(--mono); font-size: 12px; line-height: 1.5; }
+.wrap { max-width: 780px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 40px; display: flex; flex-direction: column; gap: 12px; }
+
+.head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 8px; flex-wrap: wrap; }
+.brand { color: var(--fg); letter-spacing: .22em; font-size: 13px; font-weight: 500; }
+.ver { color: var(--muted); letter-spacing: .18em; font-size: 10px; }
+
+.input-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: stretch; }
+.drop { display: flex; align-items: center; gap: 10px; min-width: 0; background: var(--panel); border: 1px dashed var(--line-hi); padding: 6px 8px; cursor: pointer; transition: border-color .15s, background .15s; }
+.drop:hover, .drop:focus-within { border-color: var(--muted); }
+.drop.over { border-color: var(--paper); background: #22201c; }
+.drop .prompt { color: var(--dim); user-select: none; }
+.drop .src { color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.drop .src.empty { color: var(--dim); }
+.thumb { width: 38px; height: 38px; flex: none; object-fit: cover; border: 1px solid var(--line-hi); background: var(--bg); }
+#file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+button { font: inherit; letter-spacing: .18em; font-size: 11px; padding: 8px 14px; cursor: pointer; border: 1px solid var(--line-hi); background: transparent; color: var(--fg); transition: background .15s, color .15s, border-color .15s; }
+button:hover:not(:disabled) { border-color: var(--muted); }
+button:focus-visible, .drop:focus-visible { outline: 2px solid var(--paper); outline-offset: 2px; }
+button:disabled { opacity: .4; cursor: not-allowed; }
+button.primary { background: var(--paper); color: var(--ink); border-color: var(--paper); font-weight: 600; }
+button.primary:hover:not(:disabled) { background: #fff8e8; }
+button.primary:disabled { background: var(--line-hi); border-color: var(--line-hi); color: var(--muted); opacity: 1; }
+button.small { font-size: 10px; padding: 6px 10px; letter-spacing: .14em; }
+button[aria-pressed="true"] { background: var(--line); border-color: var(--muted); }
+
+.budget { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--line); padding: 6px 10px; }
+.budget-k { color: var(--muted); letter-spacing: .18em; font-size: 10.5px; }
+#budget { flex: 1 1 160px; min-width: 120px; accent-color: var(--paper); }
+#budgetNum { width: 4.5em; font: inherit; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--fg); background: var(--bg); border: 1px solid var(--line-hi); padding: 4px 6px; text-align: right; }
+#budgetNum:focus-visible, #budget:focus-visible { outline: 2px solid var(--paper); outline-offset: 2px; }
+.presets { display: flex; gap: 4px; }
+.presets button { padding: 4px 8px; letter-spacing: .06em; }
+.presets button[aria-pressed="true"] { background: var(--line); border-color: var(--muted); }
+.budget-hint { color: var(--dim); font-size: 10px; letter-spacing: .06em; }
+.engine { background: var(--panel); border: 1px solid var(--line); padding: 6px 10px; }
+.engine summary { cursor: pointer; display: flex; gap: 10px; align-items: baseline; list-style-position: inside; }
+.eng-sum { color: var(--fg); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.eng-grid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 12px; align-items: center; margin-top: 10px; }
+.eng-grid label, .eng-k { color: var(--muted); letter-spacing: .14em; font-size: 10px; }
+.eng-grid input[type=text], .eng-grid input[type=password] { font: inherit; font-size: 12px; color: var(--fg); background: var(--bg); border: 1px solid var(--line-hi); padding: 5px 7px; min-width: 0; width: 100%; }
+.eng-grid input:focus-visible { outline: 2px solid var(--paper); outline-offset: 1px; }
+.eng-grid .eng-check { letter-spacing: .02em; font-size: 11px; color: var(--fg); display: flex; gap: 8px; align-items: center; }
+.eng-check input { accent-color: var(--paper); }
+.eng-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.eng-status { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.eng-status.ok { color: var(--st-done); } .eng-status.bad { color: #f08f84; }
+.eng-help { color: var(--dim); font-size: 10.5px; line-height: 1.6; margin: 8px 0 2px; }
+.eng-help code { color: var(--muted); background: var(--bg); padding: 1px 4px; overflow-wrap: anywhere; }
+@media (max-width: 560px) { .eng-grid { grid-template-columns: 1fr; } }
+.status { display: flex; justify-content: space-between; gap: 12px; letter-spacing: .16em; font-size: 11px; color: var(--muted); flex-wrap: wrap; }
+.status b { color: var(--fg); font-weight: 500; }
+.dot { position: relative; display: inline-flex; width: 8px; height: 8px; margin-right: 8px; vertical-align: 0; }
+.dot i { position: absolute; inset: 0; border-radius: 50%; background: var(--st-idle); }
+.dot i.ping { animation: ping 1.2s cubic-bezier(0,0,.2,1) infinite; opacity: .7; }
+.dot i.ping[hidden] { display: none; }
+@keyframes ping { 75%, 100% { transform: scale(2.2); opacity: 0; } }
+.tnum { font-variant-numeric: tabular-nums; }
+.label { min-height: 18px; color: var(--dim); font-style: italic; font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.frame { background: var(--panel); border: 1px solid var(--line); padding: 12px; display: flex; justify-content: center; }
+.sheet { position: relative; max-width: 100%; line-height: 0; box-shadow: 0 18px 50px rgba(0,0,0,.55); }
+.sheet canvas { display: block; max-width: 100%; height: auto; }
+#overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.sheet-tag { position: absolute; left: 8px; bottom: 6px; line-height: 1.2; font-size: 9px; letter-spacing: .16em; color: #7a7262; text-transform: uppercase; pointer-events: none; }
+
+.tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.tools .sep { flex: 1; }
+
+.analysis { border-left: 2px solid var(--line-hi); background: color-mix(in srgb, var(--panel) 70%, transparent); padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--muted); }
+.analysis .k { color: var(--dim); letter-spacing: .16em; }
+.analysis .obs { font-family: var(--serif); font-style: italic; font-size: 14px; color: var(--fg); line-height: 1.45; }
+details { margin-top: 4px; }
+summary { cursor: pointer; color: var(--muted); letter-spacing: .14em; font-size: 10.5px; padding-block: 2px; }
+summary:hover { color: var(--fg); }
+.lists { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 16px; margin-top: 8px; }
+.lists h3 { margin: 0 0 4px; font-size: 10px; font-weight: 500; color: var(--dim); letter-spacing: .18em; }
+.lists ol { margin: 0; padding-left: 26px; max-height: 260px; overflow: auto; color: var(--fg); font-size: 11px; }
+.lists li { padding-block: 1px; }
+.lists li::marker { color: var(--dim); }
+.lists .xy { color: var(--dim); }
+
+.err { border: 1px solid #5a221c; background: #26120f; color: #f08f84; padding: 8px 12px; font-size: 11px; overflow-wrap: anywhere; }
+.note { color: var(--dim); font-size: 10.5px; letter-spacing: .06em; line-height: 1.7; }
+.notice { border: 1px solid var(--line-hi); color: var(--muted); padding: 8px 12px; font-size: 11px; }
+
+@media (max-width: 560px) {
+  .input-row { grid-template-columns: 1fr; }
+  .lists { grid-template-columns: 1fr; }
+  .tools .sep { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .dot i.ping { animation: none; } }
+</style>
+
+<div class="wrap">
+  <header class="head">
+    <div class="brand">SKETCH_LAB</div>
+    <div class="ver">v0.90 / DEEP ANALYSIS · <span id="engineTag">IN CLAUDE</span></div>
+  </header>
+
+  <div class="input-row">
+    <label class="drop" id="drop" for="file" tabindex="0" title="Drop, paste or choose an image">
+      <span class="prompt">IMG&gt;</span>
+      <img class="thumb" id="thumb" alt="" hidden>
+      <span class="src empty" id="srcName">drop an image here, paste one, or click to choose…</span>
+      <input type="file" id="file" accept="image/jpeg,image/png,image/webp,image/gif">
+    </label>
+    <div class="tools">
+      <button class="primary" id="drawBtn" disabled>DRAW</button>
+      <button id="stopBtn" hidden>STOP</button>
+    </div>
+  </div>
+
+  <div class="budget">
+    <label for="budget" class="budget-k">STROKE BUDGET</label>
+    <input type="range" id="budget" min="3" max="120" step="1" value="60" aria-describedby="budgetHint">
+    <input type="number" id="budgetNum" min="3" max="120" step="1" value="60" aria-label="Stroke budget">
+    <div class="presets" role="group" aria-label="Budget presets">
+      <button class="small" data-b="10">10</button>
+      <button class="small" data-b="30">30</button>
+      <button class="small" data-b="60">60</button>
+      <button class="small" data-b="100">100</button>
+    </div>
+    <span class="budget-hint" id="budgetHint">applies to the next DRAW or REDRAW</span>
+  </div>
+
+  <details class="engine" id="engineBox" hidden>
+    <summary><span class="budget-k">MODEL</span> <span id="engineSummary" class="eng-sum"></span></summary>
+    <div class="eng-grid">
+      <label for="srvUrl">SERVER</label>
+      <input type="text" id="srvUrl" spellcheck="false" autocomplete="off" placeholder="http://localhost:8000/v1">
+      <label for="srvModel">MODEL</label>
+      <input type="text" id="srvModel" spellcheck="false" autocomplete="off" placeholder="Qwen/Qwen3.8-27B-FP8">
+      <label for="srvKey">API KEY</label>
+      <input type="password" id="srvKey" spellcheck="false" autocomplete="off" placeholder="only if the server was started with --api-key">
+      <span class="eng-k">THINKING</span>
+      <label class="eng-check"><input type="checkbox" id="srvThink"> let the model reason before answering (slower, sometimes better plans)</label>
+    </div>
+    <div class="eng-row">
+      <button class="small" id="srvTest">TEST</button>
+      <button class="small" id="srvReset">DEFAULTS</button>
+      <span class="eng-status" id="srvStatus" role="status"></span>
+    </div>
+    <p class="eng-help">Runs against any OpenAI-compatible server with a vision model. For Qwen3.8: <code>vllm serve Qwen/Qwen3.8-27B-FP8 --max-model-len 32768</code>. Settings, including the key, are kept only in this browser.</p>
+  </details>
+
+  <div class="status">
+    <div><span class="dot"><i class="ping" id="ping" hidden></i><i id="dot"></i></span>STATUS: <b id="status">IDLE</b><span id="progress"></span></div>
+    <div class="tnum">STROKE <b id="sc">00</b> / <b id="st">60</b></div>
+  </div>
+  <div class="label" id="label"></div>
+
+  <div class="frame" id="frame">
+    <div class="sheet" id="sheet">
+      <canvas id="canvas" aria-label="Line drawing"></canvas>
+      <canvas id="overlay" aria-hidden="true"></canvas>
+      <div class="sheet-tag" id="sheetTag"></div>
+    </div>
+  </div>
+
+  <div class="tools">
+    <button class="small" id="redrawBtn" disabled>↻ REDRAW</button>
+    <button class="small" id="replayBtn" disabled>▶ REPLAY</button>
+    <button class="small" id="anchorsBtn" aria-pressed="false" disabled>ANCHORS</button>
+    <span class="sep"></span>
+    <span id="saveGroup" hidden>
+      <button class="small" id="savePng" disabled>SAVE PNG</button>
+      <button class="small" id="saveSvg" disabled>SAVE SVG</button>
+      <button class="small" id="saveJson" disabled>SAVE JSON</button>
+    </span>
+  </div>
+
+  <div class="analysis" id="analysis" hidden>
+    <div id="obsRow" hidden><span class="k">[OBS] </span><span class="obs" id="obs"></span></div>
+    <div id="ancRow" hidden><span class="k">[ANCHORS] </span><span id="anc"></span></div>
+    <div id="planRow" hidden><span class="k">[PLAN] </span><span id="plan"></span></div>
+    <details id="detail">
+      <summary>FULL ANALYSIS</summary>
+      <div class="lists">
+        <div><h3>LANDMARKS · 0–1000</h3><ol id="ancList"></ol></div>
+        <div><h3>STROKE PLAN</h3><ol id="planList"></ol></div>
+      </div>
+    </details>
+  </div>
+
+  <div class="tools logrow">
+    <span class="note">SESSION LOG · runs in this browser: <b class="tnum" id="logCount">0</b></span>
+    <span class="sep"></span>
+    <button class="small" id="saveLog" disabled>SAVE LOG (CSV)</button>
+    <button class="small" id="clearLog" disabled>CLEAR LOG</button>
+  </div>
+
+  <div class="err" id="err" hidden></div>
+  <div class="notice" id="unavail" hidden>Drawing new images needs Claude, which this page can reach only when it is opened inside Claude. The example drawing and REPLAY still work here.</div>
+
+  <div class="note">
+    // four-phase pipeline: OBSERVATION → ANCHORS → PLAN → EXECUTION<br>
+    // landmarks lock spatial positions before any stroke is placed.<br>
+    // REDRAW = same image, a different artistic angle, full reanalysis. REPLAY = same strokes, drawn again, no model call.<br>
+    // STROKE BUDGET = the hard ceiling. The model plans for it, and the gesture/forms/features/details split scales with it.<br>
+    // inside Claude, each DRAW or REDRAW uses your own Claude usage. Opened as a file, it uses the local model under MODEL.
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- Prompt (from v0.70, adapted for an attached image of known size) ----------
+  const VARIANT_HINTS = [
+    '',
+    'Emphasize bold silhouette and gesture. Loose and confident.',
+    'Emphasize structural geometry and underlying construction.',
+    'Focus on unexpected details and negative space.',
+    'Draw with naive confidence — bold, simple, childlike.',
+    'Exaggerate proportions toward gentle caricature.',
+  ];
+  const MAX_STROKES = 120;          // ceiling for the stroke budget control
+  const MIN_STROKES = 3;
+  const DEFAULT_STROKES = 60;       // the v0.70 budget
+
+  const STROKE_FORMAT_BLOCK = `STROKE FORMAT:
+- Each stroke is a polyline of 3 to 10 integer (x,y) points in 0-1000 coordinate space
+- (0,0) at top-left, y increases downward
+- Each stroke includes a "describes" field: short label naming what this stroke represents
+- Use MORE points where the line curves significantly (curves are reconstructed via spline interpolation)
+- Use FEWER points for straight or nearly-straight lines
+- Each stroke = ONE continuous mark. Don't break a single contour into multiple strokes.`;
+
+  // The v0.70 split of a 60-stroke budget (1–8, 9–25, 26–45, 46–60), scaled to any budget.
+  const BANDS = [
+    [8 / 60,  'silhouette and gesture (large confident outer contours, the big shape)'],
+    [25 / 60, 'major forms (primary masses, head shape, body, prominent features)'],
+    [45 / 60, 'secondary forms and feature placement (features positioned AT your landmark coordinates)'],
+    [1,       'critical fine details (eyes, distinctive marks, focal elements, signature features)'],
+  ];
+  function allocationLines(budget) {
+    const lines = []; let prev = 0;
+    for (const [frac, what] of BANDS) {
+      // the silhouette always gets at least one stroke, even on a tiny budget
+      const end = Math.min(budget, Math.max(lines.length ? 0 : 1, Math.round(budget * frac)));
+      if (end <= prev) continue;
+      lines.push(end === prev + 1 ? `- Stroke ${end}: ${what}` : `- Strokes ${prev + 1}–${end}: ${what}`);
+      prev = end;
+    }
+    return lines.join('\n');
+  }
+
+  function buildDeepAnalysisPrompt(hint, w, h, budget) {
+    return `You are a master line artist with a methodical practice. The attached image is ${w} × ${h} pixels. You will analyze it with great care across FOUR PHASES, then produce a line drawing of up to ${budget} strokes.
+
+COORDINATES: x and y each run 0-1000 across the full image, independently of its aspect ratio. x=0 is the left edge, x=1000 the right edge; y=0 is the top edge, y=1000 the bottom edge.
+
+CRITICAL RULE: You MUST complete each phase in order, in the JSON, before the next. The structured analysis IS the work — do not skip ahead to placing stroke coordinates. The quality of phases 1-3 directly determines the quality of phase 4.
+
+═══ PHASE 1 — OBSERVATION ═══
+Look at the image carefully. In 2-3 sentences, describe:
+- The subject, setting, and overall mood
+- The lighting direction and quality (when relevant for form)
+- Anything unusual or distinctive worth capturing
+
+═══ PHASE 2 — STRUCTURAL ANCHORS (CRITICAL) ═══
+Identify 8 to 15 LANDMARK POINTS on the primary subject. Each landmark is a specific recognizable feature with explicit (x, y) coordinates in 0-1000 space.
+
+These landmarks are the SKELETON of your drawing. Every stroke you place later MUST be positioned consistently with these landmark coordinates. Spend real cognitive effort here — precise landmark placement is what separates a recognizable likeness from an abstract sketch.
+
+Example landmark types:
+- For a face: "top of head", "chin point", "left/right jaw corner", "left/right eye outer corner", "left/right eye inner corner", "nose bridge", "nose tip", "mouth left/right corner", "upper lip peak"
+- For a body: "head crown", "neck base", "left/right shoulder", "elbow", "wrist", "hip", "knee", "ankle"
+- For an animal: "ear tips", "eye centers", "nose/snout tip", "shoulder peak", "haunch", "paw positions"
+- For architecture: "roof peaks", "wall corners", "window centers", "door corners", "foundation corners"
+- For objects: structural extremes — corners, peaks, joints, focal features
+
+Be specific to THIS image. Don't use generic positions — measure each landmark by eye and commit to coordinates.
+
+═══ PHASE 3 — STROKE PLAN ═══
+BEFORE assigning any stroke coordinates, write out a numbered plan listing what EACH stroke will draw. Allocate the ${budget}-stroke budget approximately:
+${allocationLines(budget)}
+
+HARD LIMIT: the drawing has at most ${budget} strokes. The fewer strokes you have, the more each one must carry — decide what matters most about this image and spend the budget there.
+
+Each plan entry is a brief description, e.g. "stroke 14: left jawline from temple to chin point".
+
+═══ PHASE 4 — EXECUTION ═══
+Only now produce the actual stroke coordinates. Each stroke MUST be consistent with:
+1. The landmarks you committed to in Phase 2 (e.g., a stroke drawing the left eye must terminate at the "left eye" landmark coordinates)
+2. The plan you wrote in Phase 3 (in order, doing what you said)
+
+${STROKE_FORMAT_BLOCK}
+
+ART PRINCIPLES:
+- Impressionistic but COMMITTED. Specific edges, not vague blobs.
+- Confident, deliberate marks. No scribbling, no tentative repeats.
+- Negative space matters — don't outline everything that exists.
+- No color, no shading, no hatching, no cross-hatching.${hint ? '\n- ' + hint : ''}
+
+Respond with ONLY this JSON object. No markdown fences, no prose outside the JSON. The fields must appear in the order shown — observation first, then landmarks, then stroke_plan, then strokes.
+{
+  "observation": "<2-3 sentences from PHASE 1>",
+  "landmarks": [
+    {"name": "<feature name>", "x": <int 0-1000>, "y": <int 0-1000>}
+  ],
+  "stroke_plan": [
+    "stroke 1: <brief description>",
+    "stroke 2: <brief description>"
+  ],
+  "strokes": [
+    {"describes": "<part name>", "points": [[x,y], [x,y], [x,y]]}
+  ]
+}`;
+  }
+
+  // ---------- Response parsing (same tolerance as v0.70) ----------
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  function normaliseResult(parsed, limit = MAX_STROKES) {
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.strokes)) {
+      throw { code: 'no_strokes', message: 'Response missing strokes array' };
+    }
+    const strokes = parsed.strokes.map(s => {
+      if (!s || typeof s !== 'object') return null;
+      const pts = Array.isArray(s.points) ? s.points : (Array.isArray(s) ? s : null);
+      if (!Array.isArray(pts) || pts.length < 2) return null;
+      const cleaned = pts.map(pt => Array.isArray(pt)
+        ? [clamp(Number(pt[0]) || 0, 0, 1000), clamp(Number(pt[1]) || 0, 0, 1000)] : [0, 0]);
+      return { points: cleaned, describes: typeof s.describes === 'string' ? s.describes : '' };
+    }).filter(Boolean).slice(0, limit);
+    const observation = (typeof parsed.observation === 'string' && parsed.observation) ||
+                        (typeof parsed.analysis === 'string' && parsed.analysis) || '';
+    const landmarks = Array.isArray(parsed.landmarks)
+      ? parsed.landmarks.filter(l => l && typeof l === 'object' && typeof l.name === 'string' &&
+          Number.isFinite(Number(l.x)) && Number.isFinite(Number(l.y)))
+          .map(l => ({ name: l.name, x: clamp(Number(l.x), 0, 1000), y: clamp(Number(l.y), 0, 1000) }))
+      : [];
+    const strokePlan = Array.isArray(parsed.stroke_plan) ? parsed.stroke_plan.filter(s => typeof s === 'string') : [];
+    return { strokes, observation, landmarks, strokePlan };
+  }
+
+  // ---------- Catmull-Rom smoothing (unchanged from v0.70) ----------
+  function smoothPolyline(points, samplesPerSegment = 10) {
+    if (points.length < 2) return points.slice();
+    const N = samplesPerSegment;
+    if (points.length === 2) {
+      const out = [];
+      for (let i = 0; i <= N; i++) {
+        const t = i / N;
+        out.push([points[0][0] + (points[1][0] - points[0][0]) * t, points[0][1] + (points[1][1] - points[0][1]) * t]);
+      }
+      return out;
+    }
+    const n = points.length;
+    const ext = [
+      [2 * points[0][0] - points[1][0], 2 * points[0][1] - points[1][1]],
+      ...points,
+      [2 * points[n - 1][0] - points[n - 2][0], 2 * points[n - 1][1] - points[n - 2][1]]
+    ];
+    const out = [ext[1].slice()];
+    for (let i = 1; i < ext.length - 2; i++) {
+      const p0 = ext[i - 1], p1 = ext[i], p2 = ext[i + 1], p3 = ext[i + 2];
+      for (let j = 1; j <= N; j++) {
+        const t = j / N, t2 = t * t, t3 = t2 * t;
+        const x = 0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3);
+        const y = 0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3);
+        out.push([x, y]);
+      }
+    }
+    return out;
+  }
+
+  // Each stroke's hand (wobble, weight, opacity) is fixed once, so REPLAY,
+  // resizing and the SVG export all show the same marks.
+  function prepareMarks(strokes) {
+    return strokes.map(s => {
+      const cp = s.points;
+      const wobbled = cp.map((p, i) => (i === 0 || i === cp.length - 1) ? [p[0], p[1]]
+        : [p[0] + (Math.random() - 0.5) * 2, p[1] + (Math.random() - 0.5) * 2]);
+      return {
+        describes: s.describes,
+        path: smoothPolyline(wobbled, 10),            // 0-1000 space
+        baseWidth: 1.0 + Math.random() * 0.8,
+        alpha: 0.72 + Math.random() * 0.22,
+      };
+    });
+  }
+
+  // Each stroke is drawn as many short segments. With a translucent colour, the
+  // round caps where segments meet overlap and darken, which shows as a beaded,
+  // dotted line on high-density screens. So each stroke uses an opaque graphite
+  // pre-mixed with the paper at that stroke's opacity: same tone, no beads.
+  function inkFor(alpha) {
+    const mix = (ink, paper) => Math.round(paper + (ink - paper) * alpha);
+    return `rgb(${mix(28, 236)}, ${mix(26, 228)}, ${mix(24, 211)})`;
+  }
+
+  function widthMult(t) {
+    const taper = Math.min(Math.min(1, t / 0.12 + 0.25), Math.min(1, (1 - t) / 0.12 + 0.25));
+    return taper * (0.88 + 0.18 * Math.sin(t * Math.PI));
+  }
+
+  // ---------- DOM ----------
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas'), overlay = $('overlay'), frame = $('frame');
+  const ui = {
+    drop: $('drop'), file: $('file'), thumb: $('thumb'), srcName: $('srcName'),
+    drawBtn: $('drawBtn'), stopBtn: $('stopBtn'), redrawBtn: $('redrawBtn'), replayBtn: $('replayBtn'),
+    anchorsBtn: $('anchorsBtn'), saveGroup: $('saveGroup'), savePng: $('savePng'), saveSvg: $('saveSvg'), saveJson: $('saveJson'),
+    status: $('status'), dot: $('dot'), ping: $('ping'), progress: $('progress'), sc: $('sc'), st: $('st'), label: $('label'),
+    analysis: $('analysis'), obsRow: $('obsRow'), obs: $('obs'), ancRow: $('ancRow'), anc: $('anc'), planRow: $('planRow'), plan: $('plan'),
+    ancList: $('ancList'), planList: $('planList'), err: $('err'), unavail: $('unavail'), sheetTag: $('sheetTag'),
+    logCount: $('logCount'), saveLog: $('saveLog'), clearLog: $('clearLog'),
+    budget: $('budget'), budgetNum: $('budgetNum'), presets: [...document.querySelectorAll('.presets button')],
+  };
+
+  // ---------- Stroke budget ----------
+  const BUDGET_KEY = 'sketch-lab:budget';
+  let strokeBudget = DEFAULT_STROKES;
+  function setBudget(v, fromNumberBox) {
+    const n = Math.round(Number(v));
+    if (!Number.isFinite(n)) return;
+    strokeBudget = clamp(n, MIN_STROKES, MAX_STROKES);
+    ui.budget.value = String(strokeBudget);
+    if (!fromNumberBox) ui.budgetNum.value = String(strokeBudget);
+    ui.presets.forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.b) === strokeBudget)));
+    try { localStorage.setItem(BUDGET_KEY, String(strokeBudget)); } catch {}
+  }
+  ui.budget.addEventListener('input', () => setBudget(ui.budget.value));
+  ui.budgetNum.addEventListener('input', () => { if (ui.budgetNum.value !== '') setBudget(ui.budgetNum.value, true); });
+  ui.budgetNum.addEventListener('change', () => setBudget(ui.budgetNum.value === '' ? strokeBudget : ui.budgetNum.value));
+  ui.presets.forEach(b => b.addEventListener('click', () => setBudget(b.dataset.b)));
+  try { const saved = localStorage.getItem(BUDGET_KEY); setBudget(saved ? saved : DEFAULT_STROKES); } catch { setBudget(DEFAULT_STROKES); }
+
+  const state = {
+    status: 'IDLE',
+    image: null,          // { blob, name, w, h, url }
+    result: null,         // { strokes, observation, landmarks, strokePlan, w, h, source, variant }
+    marks: null,
+    redrawCount: 0,
+    runId: 0,
+    ctl: null,
+    showAnchors: false,
+    sample: null,
+    downloads: null,
+    canImages: false,
+  };
+
+  const pad = n => String(n).padStart(2, '0');
+  const DOT = { IDLE: '--st-idle', ANALYZING: '--st-analyse', DRAWING: '--st-draw', COMPLETE: '--st-done', ERROR: '--st-err', STOPPED: '--st-idle' };
+
+  function setStatus(s) {
+    state.status = s;
+    ui.status.textContent = s;
+    ui.dot.style.background = `var(${DOT[s] || '--st-idle'})`;
+    ui.ping.style.background = `var(${DOT[s] || '--st-idle'})`;
+    const busy = s === 'ANALYZING' || s === 'DRAWING';
+    ui.ping.hidden = !busy;
+    if (!busy) ui.progress.textContent = '';
+    refreshControls();
+  }
+
+  function refreshControls() {
+    const busy = state.status === 'ANALYZING' || state.status === 'DRAWING';
+    const canSample = engineReady();
+    ui.drawBtn.disabled = busy || !state.image || !canSample;
+    ui.stopBtn.hidden = !busy;
+    const hasModelResult = state.result && state.result.source === 'model';
+    ui.redrawBtn.disabled = busy || !state.image || !canSample || !hasModelResult;
+    ui.replayBtn.disabled = busy || !state.marks;
+    ui.anchorsBtn.disabled = !state.result || !state.result.landmarks.length;
+    const canSave = !busy && !!state.marks && canDownload();
+    ui.savePng.disabled = ui.saveSvg.disabled = !canSave;
+    ui.saveJson.disabled = !canSave || !state.result;
+  }
+
+  function showError(msg) { ui.err.textContent = 'ERR > ' + msg; ui.err.hidden = false; }
+  function clearError() { ui.err.hidden = true; ui.err.textContent = ''; }
+
+  // ---------- Canvas sizing ----------
+  let disp = { w: 600, h: 450, dpr: 1 };
+
+  function sizeSheet(aw, ah) {
+    const avail = Math.max(200, frame.clientWidth - 26);
+    const maxW = Math.min(700, avail), maxH = 520;
+    const s = Math.min(maxW / aw, maxH / ah);
+    const w = Math.max(1, Math.round(aw * s)), h = Math.max(1, Math.round(ah * s));
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    disp = { w, h, dpr };
+    for (const c of [canvas, overlay]) {
+      c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+      c.style.width = w + 'px'; c.style.height = h + 'px';
+    }
+    paintPaper();
+    drawOverlay();
+  }
+
+  function paintPaper() {
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#ece4d3';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const n = (Math.random() - 0.5) * 14;
+      d[i] = clamp(d[i] + n, 0, 255); d[i + 1] = clamp(d[i + 1] + n, 0, 255); d[i + 2] = clamp(d[i + 2] + n, 0, 255);
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  function inkCtx() {
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(disp.dpr, 0, 0, disp.dpr, 0, 0);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    return ctx;
+  }
+
+  function toDisplay(path) {
+    const sx = disp.w / 1000, sy = disp.h / 1000;
+    return path.map(([x, y]) => [x * sx, y * sy]);
+  }
+
+  function arcLengths(pts) {
+    const cum = [0]; let total = 0;
+    for (let i = 1; i < pts.length; i++) { total += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); cum.push(total); }
+    return { cum, total };
+  }
+
+  function drawMarkWhole(ctx, mark) {
+    const pts = toDisplay(mark.path);
+    const { cum, total } = arcLengths(pts);
+    if (total < 0.5) return;
+    ctx.strokeStyle = inkFor(mark.alpha);
+    for (let i = 0; i < pts.length - 1; i++) {
+      ctx.lineWidth = mark.baseWidth * widthMult(((cum[i] + cum[i + 1]) / 2) / total);
+      ctx.beginPath(); ctx.moveTo(pts[i][0], pts[i][1]); ctx.lineTo(pts[i + 1][0], pts[i + 1][1]); ctx.stroke();
+    }
+  }
+
+  function animateMark(ctx, mark, runId) {
+    return new Promise(resolve => {
+      const pts = toDisplay(mark.path);
+      const { cum, total } = arcLengths(pts);
+      if (total < 0.5) { resolve(); return; }
+      const duration = Math.min(1300, Math.max(280, total * 4.5));
+      const start = performance.now();
+      ctx.strokeStyle = inkFor(mark.alpha);
+      let lastX = pts[0][0], lastY = pts[0][1], idx = 0;
+      function frameFn(now) {
+        if (runId !== state.runId) { resolve(); return; }
+        const t = Math.min(1, (now - start) / duration);
+        const target = total * t;
+        let i = idx;
+        while (i < pts.length - 1 && cum[i + 1] <= target) {
+          ctx.lineWidth = mark.baseWidth * widthMult(((cum[i] + cum[i + 1]) / 2) / total);
+          ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(pts[i + 1][0], pts[i + 1][1]); ctx.stroke();
+          lastX = pts[i + 1][0]; lastY = pts[i + 1][1]; i++;
+        }
+        if (i < pts.length - 1 && target < total) {
+          const r = (target - cum[i]) / Math.max(0.001, cum[i + 1] - cum[i]);
+          const x = pts[i][0] + (pts[i + 1][0] - pts[i][0]) * r, y = pts[i][1] + (pts[i + 1][1] - pts[i][1]) * r;
+          ctx.lineWidth = mark.baseWidth * widthMult(((cum[i] + target) / 2) / total);
+          ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(x, y); ctx.stroke();
+          lastX = x; lastY = y;
+        }
+        idx = i;
+        if (t < 1) requestAnimationFrame(frameFn); else resolve();
+      }
+      requestAnimationFrame(frameFn);
+    });
+  }
+
+  const reduceMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  async function animateAll(runId) {
+    const ctx = inkCtx();
+    const marks = state.marks;
+    ui.st.textContent = pad(marks.length);
+    for (let i = 0; i < marks.length; i++) {
+      if (runId !== state.runId) return false;
+      ui.sc.textContent = pad(i + 1);
+      ui.label.textContent = marks[i].describes ? `→ drawing: "${marks[i].describes}"` : '';
+      if (reduceMotion()) drawMarkWhole(ctx, marks[i]);
+      else { await animateMark(ctx, marks[i], runId); await new Promise(r => setTimeout(r, 70)); }
+    }
+    return runId === state.runId;
+  }
+
+  function renderStatic() {
+    if (!state.result) return;
+    sizeSheet(state.result.w, state.result.h);
+    if (!state.marks) return;
+    const ctx = inkCtx();
+    state.marks.forEach(m => drawMarkWhole(ctx, m));
+    ui.sc.textContent = pad(state.marks.length); ui.st.textContent = pad(state.marks.length);
+  }
+
+  function drawOverlay() {
+    const ctx = overlay.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    if (!state.showAnchors || !state.result || !state.result.landmarks.length) return;
+    ctx.setTransform(disp.dpr, 0, 0, disp.dpr, 0, 0);
+    ctx.font = '500 9px "IBM Plex Mono", ui-monospace, monospace';
+    ctx.textBaseline = 'middle';
+    for (const l of state.result.landmarks) {
+      const x = l.x / 1000 * disp.w, y = l.y / 1000 * disp.h;
+      ctx.strokeStyle = 'rgba(196, 70, 40, .9)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(x - 4, y); ctx.lineTo(x + 4, y); ctx.moveTo(x, y - 4); ctx.lineTo(x, y + 4); ctx.stroke();
+      const tx = x + 6 > disp.w - 90 ? x - 6 : x + 6;
+      ctx.textAlign = tx < x ? 'right' : 'left';
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(236, 228, 211, .85)'; ctx.strokeText(l.name, tx, y);
+      ctx.fillStyle = 'rgba(160, 52, 28, 1)'; ctx.fillText(l.name, tx, y);
+    }
+  }
+
+  // ---------- Analysis panel ----------
+  function renderAnalysis() {
+    const r = state.result;
+    if (!r || r.source !== 'model') { ui.analysis.hidden = true; return; }
+    ui.analysis.hidden = false;
+    ui.obsRow.hidden = !r.observation; ui.obs.textContent = r.observation;
+    ui.ancRow.hidden = false;
+    if (r.landmarks.length) {
+      const names = r.landmarks.map(l => l.name).slice(0, 5).join(', ');
+      ui.anc.textContent = `${r.landmarks.length} anchors: ${names}${r.landmarks.length > 5 ? `, +${r.landmarks.length - 5} more` : ''}`;
+    } else ui.anc.textContent = '(no landmarks returned)';
+    ui.planRow.hidden = false;
+    ui.plan.textContent = r.strokePlan.length ? `${r.strokePlan.length}-stroke plan committed` : '(no plan returned)';
+    ui.ancList.replaceChildren(...r.landmarks.map(l => {
+      const li = document.createElement('li');
+      li.append(l.name + ' ');
+      const xy = document.createElement('span'); xy.className = 'xy tnum'; xy.textContent = `${Math.round(l.x)}, ${Math.round(l.y)}`;
+      li.append(xy); return li;
+    }));
+    ui.planList.replaceChildren(...r.strokePlan.map(p => {
+      const li = document.createElement('li'); li.textContent = p.replace(/^stroke\s*\d+\s*:\s*/i, ''); return li;
+    }));
+  }
+
+  function setSheetTag() {
+    const r = state.result;
+    if (!r) { ui.sheetTag.textContent = ''; return; }
+    if (r.source === 'example') ui.sheetTag.textContent = 'Example · not a model drawing';
+    else if (r.source === 'saved') ui.sheetTag.textContent = 'Last drawing · ' + (r.imageName || 'saved');
+    else ui.sheetTag.textContent = '';
+  }
+
+  // ---------- Image input ----------
+  function acceptFile(file) {
+    if (!file || !/^image\//.test(file.type)) { showError('That file is not an image. Use a JPEG, PNG, WebP or GIF.'); return; }
+    clearError();
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      if (state.image && state.image.url) URL.revokeObjectURL(state.image.url);
+      state.image = { blob: file, name: file.name || 'pasted image', w: img.naturalWidth, h: img.naturalHeight, url };
+      state.redrawCount = 0;
+      ui.thumb.src = url; ui.thumb.hidden = false;
+      ui.srcName.textContent = `${state.image.name} · ${img.naturalWidth}×${img.naturalHeight}`;
+      ui.srcName.classList.remove('empty');
+      refreshControls();
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); showError('That image could not be opened. Try saving it as a JPEG or PNG first.'); };
+    img.src = url;
+  }
+
+  ui.file.addEventListener('change', () => { if (ui.file.files[0]) acceptFile(ui.file.files[0]); ui.file.value = ''; });
+  ui.drop.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ui.file.click(); } });
+  ['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); ui.drop.classList.add('over'); }));
+  ['dragleave', 'dragend'].forEach(t => document.addEventListener(t, e => { if (!e.relatedTarget) ui.drop.classList.remove('over'); }));
+  document.addEventListener('drop', e => {
+    e.preventDefault(); ui.drop.classList.remove('over');
+    const f = [...(e.dataTransfer?.files || [])].find(f => /^image\//.test(f.type));
+    if (f) acceptFile(f); else showError('Drop an image file. Images dragged from another web page often arrive as a link, so save the image first and drop the file.');
+  });
+  document.addEventListener('paste', e => {
+    const item = [...(e.clipboardData?.items || [])].find(i => i.kind === 'file' && /^image\//.test(i.type));
+    if (item) { e.preventDefault(); acceptFile(item.getAsFile()); }
+  });
+
+  // ---------- The model call ----------
+  const ERROR_COPY = {
+    not_granted: 'Claude access was not allowed for this page. Reload the page to be asked again.',
+    sampling_disabled: 'Claude is not available on this account.',
+    not_declared: 'This version of the page cannot call Claude.',
+    capability_disabled: 'Claude is not available in this view.',
+    capability_removed: 'This Claude app is too old to run the drawing step. Update the app and try again.',
+    images_unavailable: 'This view cannot send images to Claude.',
+    image_rejected: 'Claude could not take that image. Try a smaller JPEG or PNG.',
+    rate_limited: 'Too many drawings in a short time, or your usage limit was reached. Wait a minute and try again.',
+    session_expired: 'Your Claude session has expired. Sign in again, then reload this page.',
+    refused: 'Claude declined to draw this image. Try a different one.',
+    empty_completion: 'Claude returned nothing. Try again.',
+    invalid_json: 'The reply was not a complete drawing (usually it ran out of room). Try again, or REDRAW for a different take.',
+    prompt_too_large: 'The request was too large.',
+    no_strokes: 'The reply contained no strokes. Try again.',
+    unreachable: 'Could not reach the model server. Check that it is running at the address under MODEL, then press TEST. If you opened this page from a website rather than a file on your computer, your browser may be blocking the connection: download the page and open the file instead.',
+    http_error: 'The model server returned an error.',
+    truncated: 'The model ran out of room before finishing the drawing. Try a smaller stroke budget, or switch thinking off.',
+  };
+
+  // ---------- Engines ----------
+  // Inside Claude: the page asks Claude through the artifact runtime (claude.use("sample")).
+  // Anywhere else: the page talks to a local OpenAI-compatible server (vLLM or SGLang)
+  // running a vision-language model, by default Qwen/Qwen3.8-27B-FP8.
+  const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function');
+  state.engine = IN_CLAUDE ? 'claude' : 'local';
+
+  const LOCAL_DEFAULTS = { url: 'http://localhost:8000/v1', model: 'Qwen/Qwen3.8-27B-FP8', key: '', thinking: false };
+  const LOCAL_KEY = 'sketch-lab:local-engine';
+  let local = { ...LOCAL_DEFAULTS };
+  try { local = { ...LOCAL_DEFAULTS, ...JSON.parse(localStorage.getItem(LOCAL_KEY) || '{}') }; } catch {}
+
+  function engineReady() {
+    if (state.engine === 'claude') return !!state.sample && state.canImages;
+    return !!(local.url && local.model);
+  }
+  function engineName() {
+    return state.engine === 'claude' ? 'Claude (in-app)' : local.model;
+  }
+  function canDownload() { return state.engine === 'local' || !!state.downloads; }
+
+  function baseUrl() { return String(local.url || '').trim().replace(/\/+$/, '').replace(/\/chat\/completions$/, ''); }
+  function authHeaders() { return local.key ? { Authorization: 'Bearer ' + local.key } : {}; }
+
+  // Same downsizing the Claude runtime applies (about 1.2 megapixels), so both engines see a similar image.
+  function imageToDataUrl(img) {
+    return new Promise((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => {
+        const scale = Math.min(1, Math.sqrt(1.2e6 / (el.naturalWidth * el.naturalHeight)));
+        const w = Math.max(1, Math.round(el.naturalWidth * scale)), h = Math.max(1, Math.round(el.naturalHeight * scale));
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        const cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h); cx.drawImage(el, 0, 0, w, h);
+        resolve(c.toDataURL('image/jpeg', 0.9));
+      };
+      el.onerror = () => reject({ code: 'image_rejected', message: 'Image could not be decoded' });
+      el.src = img.url;
+    });
+  }
+
+  function parseModelJson(text) {
+    let t = String(text || '');
+    t = t.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/^[\s\S]*<\/think>/i, '').trim();
+    const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fence) t = fence[1].trim();
+    const a = t.indexOf('{'), b = t.lastIndexOf('}');
+    if (a === -1 || b <= a) throw { code: 'invalid_json', message: 'No JSON object in reply', text };
+    try { return JSON.parse(t.slice(a, b + 1)); }
+    catch (e) { throw { code: 'invalid_json', message: e.message, text }; }
+  }
+
+  async function callLocal(prompt, img, { signal, onText, onThinking }) {
+    const dataUrl = await imageToDataUrl(img);
+    const think = !!local.thinking;
+    const body = {
+      model: local.model,
+      messages: [{ role: 'user', content: [
+        { type: 'image_url', image_url: { url: dataUrl } },
+        { type: 'text', text: prompt },
+      ] }],
+      max_tokens: think ? 24576 : 12288,
+      stream: true,
+      // Qwen's recommended settings, except presence_penalty, which is left at 0
+      // because a drawing's coordinates repeat the same digits many times over.
+      temperature: think ? 1.0 : 0.7,
+      top_p: think ? 0.95 : 0.8,
+      top_k: 20,
+      presence_penalty: 0,
+      chat_template_kwargs: { enable_thinking: think },
+    };
+    let resp;
+    try {
+      resp = await fetch(baseUrl() + '/chat/completions', {
+        method: 'POST', signal,
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      if (signal.aborted) throw { code: 'cancelled' };
+      throw { code: 'unreachable', message: String(e && e.message || e) };
+    }
+    if (!resp.ok) {
+      let detail = ''; try { detail = (await resp.text()).slice(0, 300); } catch {}
+      throw { code: 'http_error', message: `HTTP ${resp.status} ${detail}` };
+    }
+    let text = '', finish = null;
+    const reader = resp.body.getReader(), dec = new TextDecoder();
+    let buf = '';
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split('\n'); buf = lines.pop();
+        for (const line of lines) {
+          const s = line.trim();
+          if (!s.startsWith('data:')) continue;
+          const payload = s.slice(5).trim();
+          if (payload === '[DONE]') continue;
+          let j; try { j = JSON.parse(payload); } catch { continue; }
+          const ch = j.choices && j.choices[0];
+          if (!ch) continue;
+          const d = ch.delta || {};
+          if (d.reasoning_content || d.reasoning) onThinking && onThinking();
+          if (d.content) { text += d.content; onText && onText({ text }); }
+          if (ch.finish_reason) finish = ch.finish_reason;
+        }
+      }
+    } catch (e) {
+      if (signal.aborted) throw { code: 'cancelled', text };
+      throw { code: 'unreachable', message: String(e && e.message || e), text };
+    }
+    if (finish === 'length') throw { code: 'truncated', message: 'finish_reason=length', text };
+    return parseModelJson(text);
+  }
+
+  async function callModel(prompt, img, opts) {
+    if (state.engine === 'claude') {
+      return state.sample.json(prompt, {
+        images: img.blob, signal: opts.signal, modelTier: 'default', cache: false,
+        onText: opts.onText,
+      });
+    }
+    return callLocal(prompt, img, opts);
+  }
+
+  async function run(isRedraw) {
+    if (!state.image || !engineReady()) return;
+    state.runId++;
+    const runId = state.runId;
+    clearError();
+    state.showAnchors = false; ui.anchorsBtn.setAttribute('aria-pressed', 'false');
+    ui.sc.textContent = '00'; ui.label.textContent = '';
+    const variant = isRedraw ? state.redrawCount + 1 : 0;
+    const hint = VARIANT_HINTS[variant % VARIANT_HINTS.length];
+    const img = state.image;
+
+    setStatus('ANALYZING');
+    ui.progress.textContent = ' · thinking…';
+    const ctl = new AbortController(); state.ctl = ctl;
+    const tStart = performance.now();
+    const budget = strokeBudget;
+    ui.st.textContent = pad(budget);
+    const logBase = { engine: state.engine, model: engineName(), image: img.name, size: `${img.w}x${img.h}`, budget, variant, hint: hint || '(default)' };
+    let parsed;
+    try {
+      // Every DRAW/REDRAW is a fresh call (no cached answers), so logged timings are real.
+      parsed = await callModel(buildDeepAnalysisPrompt(hint, img.w, img.h, budget), img, {
+        signal: ctl.signal,
+        onThinking: () => { if (runId === state.runId) ui.progress.textContent = ' · thinking…'; },
+        onText: ({ text }) => {
+          if (runId !== state.runId) return;
+          const n = (text.match(/"describes"/g) || []).length;
+          const stage = n ? `${n} strokes` : /"stroke_plan"/.test(text) ? 'planning' : /"landmarks"/.test(text) ? 'placing anchors' : 'observing';
+          ui.progress.textContent = ' · ' + stage;
+        },
+      });
+    } catch (e) {
+      if (runId !== state.runId) return;
+      state.ctl = null;
+      const secs = (performance.now() - tStart) / 1000;
+      if (e && e.code === 'cancelled') { logRun({ ...logBase, outcome: 'stopped', analysis_s: secs }); setStatus('STOPPED'); return; }
+      logRun({ ...logBase, outcome: 'error: ' + (e && e.code || 'unknown'), analysis_s: secs });
+      const base = ERROR_COPY[e && e.code];
+      const who = state.engine === 'claude' ? 'Claude' : 'the model server';
+      showError(base ? (e.code === 'http_error' ? `${base} ${e.message || ''}` : base)
+                     : (`Something went wrong reaching ${who}. Try again. ` + (e && e.message ? `(${e.message})` : '')));
+      setStatus('ERROR');
+      if (['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed', 'images_unavailable'].includes(e && e.code)) {
+        state.sample = null; refreshControls();
+      }
+      return;
+    }
+    state.ctl = null;
+    if (runId !== state.runId) return;
+    const analysisS = (performance.now() - tStart) / 1000;
+
+    let result;
+    let returned = 0;
+    try { returned = Array.isArray(parsed && parsed.strokes) ? parsed.strokes.length : 0; result = normaliseResult(parsed, budget); if (!result.strokes.length) throw { code: 'no_strokes' }; }
+    catch (e) { logRun({ ...logBase, outcome: 'error: ' + (e.code || 'unreadable'), analysis_s: analysisS }); showError(ERROR_COPY[e.code] || 'The reply could not be read as a drawing.'); setStatus('ERROR'); return; }
+
+    if (isRedraw) state.redrawCount++;
+    state.result = { ...result, w: img.w, h: img.h, source: 'model', engine: state.engine, model: engineName(), budget, returned, variant, hint, imageName: img.name, at: new Date().toISOString(),
+      timing: { analysis_s: +analysisS.toFixed(1) } };
+    state.marks = prepareMarks(result.strokes);
+    saveLast();
+    renderAnalysis(); setSheetTag();
+    sizeSheet(img.w, img.h);
+    setStatus('DRAWING');
+    const tDraw = performance.now();
+    const done = await animateAll(runId);
+    if (!done) return;
+    const drawingS = (performance.now() - tDraw) / 1000;
+    state.result.timing.drawing_s = +drawingS.toFixed(1);
+    saveLast();
+    logRun({ ...logBase, outcome: 'complete', analysis_s: analysisS, drawing_s: drawingS,
+      strokes: result.strokes.length, strokes_returned: returned, landmarks: result.landmarks.length, plan_items: result.strokePlan.length,
+      landmark_names: result.landmarks.map(l => l.name).join('; ') });
+    ui.label.textContent = '';
+    setStatus('COMPLETE');
+    ui.progress.textContent = ` · ${Math.round(analysisS)} s analysis · ${Math.round(drawingS)} s drawing`;
+  }
+
+  // ---------- Session log (this browser only; save as CSV for the write-up) ----------
+  const LOG_KEY = 'sketch-lab:log';
+  let runLog = [];
+  try { runLog = JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); if (!Array.isArray(runLog)) runLog = []; } catch { runLog = []; }
+  function logRun(entry) {
+    const row = { at: new Date().toISOString(), ...entry };
+    for (const k of ['analysis_s', 'drawing_s']) if (typeof row[k] === 'number') row[k] = +row[k].toFixed(1);
+    runLog.push(row);
+    try { localStorage.setItem(LOG_KEY, JSON.stringify(runLog)); } catch {}
+    updateLogUi();
+  }
+  const LOG_COLS = ['at', 'engine', 'model', 'image', 'size', 'budget', 'variant', 'hint', 'outcome', 'analysis_s', 'drawing_s', 'strokes', 'strokes_returned', 'landmarks', 'plan_items', 'landmark_names'];
+  function logCsv() {
+    const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    return [LOG_COLS.join(','), ...runLog.map(r => LOG_COLS.map(c => esc(r[c])).join(','))].join('\n') + '\n';
+  }
+  function updateLogUi() {
+    ui.logCount.textContent = runLog.length;
+    ui.saveLog.disabled = !canDownload() || !runLog.length;
+    ui.clearLog.disabled = !runLog.length;
+  }
+
+  async function replay() {
+    if (!state.marks || !state.result) return;
+    state.runId++;
+    const runId = state.runId;
+    clearError();
+    sizeSheet(state.result.w, state.result.h);
+    ui.sc.textContent = '00';
+    setStatus('DRAWING');
+    const done = await animateAll(runId);
+    if (!done) return;
+    ui.label.textContent = '';
+    setStatus('COMPLETE');
+  }
+
+  function stop() {
+    if (state.ctl) { state.ctl.abort(); state.ctl = null; }
+    state.runId++;
+    ui.label.textContent = '';
+    setStatus('STOPPED');
+  }
+
+  ui.drawBtn.addEventListener('click', () => { state.redrawCount = 0; run(false); });
+  ui.redrawBtn.addEventListener('click', () => run(true));
+  ui.replayBtn.addEventListener('click', replay);
+  ui.stopBtn.addEventListener('click', stop);
+  ui.anchorsBtn.addEventListener('click', () => {
+    state.showAnchors = !state.showAnchors;
+    ui.anchorsBtn.setAttribute('aria-pressed', String(state.showAnchors));
+    drawOverlay();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && (state.status === 'ANALYZING' || state.status === 'DRAWING')) stop(); });
+
+  // ---------- Saving ----------
+  function baseName() {
+    const n = (state.result && state.result.imageName || 'sketch').replace(/\.[a-z0-9]+$/i, '').replace(/[^\w\- ]+/g, '').trim() || 'sketch';
+    const v = state.result && state.result.variant ? `-v${state.result.variant}` : '';
+    return `sketch-lab_${n}${v}`;
+  }
+
+  function buildSvg() {
+    const r = state.result, W = r.w, H = r.h;
+    const s = Math.min(1400 / W, 1400 / H);
+    const w = Math.round(W * s), h = Math.round(H * s);
+    const k = w / 700;   // keep line weight in proportion to the on-screen sheet
+    const paths = state.marks.map(m => {
+      const d = m.path.map(([x, y], i) => `${i ? 'L' : 'M'}${(x / 1000 * w).toFixed(1)},${(y / 1000 * h).toFixed(1)}`).join('');
+      const label = (m.describes || '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+      return `  <path d="${d}" stroke-width="${(m.baseWidth * k).toFixed(2)}" stroke-opacity="${m.alpha.toFixed(2)}"><title>${label}</title></path>`;
+    }).join('\n');
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+  <rect width="100%" height="100%" fill="#ece4d3"/>
+  <g fill="none" stroke="#1c1a18" stroke-linecap="round" stroke-linejoin="round">
+${paths}
+  </g>
+</svg>
+`;
+  }
+
+  async function offer(filename, data, btn) {
+    if (state.engine === 'local' && !state.downloads) {
+      // Outside Claude the browser saves files the ordinary way.
+      const blob = data instanceof Blob ? data : new Blob([data], { type: 'application/octet-stream' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = filename;
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      return;
+    }
+    if (!state.downloads) return;
+    btn.disabled = true;
+    try { await state.downloads.save({ filename, data }); }
+    catch (e) {
+      if (e && e.code === 'declined') {}
+      else if (e && e.code === 'rate_limited') showError('A save is already waiting for your answer.');
+      else if (e && ['unavailable', 'not_granted', 'capability_disabled', 'capability_removed'].includes(e.code)) { state.downloads = null; ui.saveGroup.hidden = true; }
+      else showError('The file could not be saved.');
+    } finally { refreshControls(); }
+  }
+
+  ui.savePng.addEventListener('click', () => {
+    canvas.toBlob(b => { if (b) offer(baseName() + '.png', b, ui.savePng); else showError('The drawing could not be turned into a PNG.'); }, 'image/png');
+  });
+  ui.saveSvg.addEventListener('click', () => offer(baseName() + '.svg', buildSvg(), ui.saveSvg));
+  ui.saveJson.addEventListener('click', () => {
+    const r = state.result;
+    const out = { tool: 'Sketch Lab v0.90', engine: r.engine || null, model: r.model || null, image: r.imageName || null, size: [r.w, r.h], variant_hint: r.hint || null, created: r.at || null, stroke_budget: r.budget || null, strokes_returned: r.returned || null, timing: r.timing || null,
+      observation: r.observation, landmarks: r.landmarks, stroke_plan: r.strokePlan, strokes: r.strokes };
+    offer(baseName() + '.json', JSON.stringify(out, null, 2), ui.saveJson);
+  });
+
+  ui.saveLog.addEventListener('click', () => {
+    const d = new Date(), stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    offer(`sketch-lab_session-log_${stamp}.csv`, logCsv(), ui.saveLog).then(updateLogUi);
+  });
+  let clearArmed = null;
+  ui.clearLog.addEventListener('click', () => {
+    if (!clearArmed) {
+      ui.clearLog.textContent = 'CONFIRM CLEAR';
+      clearArmed = setTimeout(() => { clearArmed = null; ui.clearLog.textContent = 'CLEAR LOG'; }, 4000);
+      return;
+    }
+    clearTimeout(clearArmed); clearArmed = null;
+    ui.clearLog.textContent = 'CLEAR LOG';
+    runLog = [];
+    try { localStorage.removeItem(LOG_KEY); } catch {}
+    updateLogUi();
+  });
+
+  // ---------- Last drawing (this browser only) ----------
+  const KEY = 'sketch-lab:last';
+  function saveLast() {
+    try { localStorage.setItem(KEY, JSON.stringify(state.result)); } catch {}
+  }
+  function loadLast() {
+    try {
+      const r = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (r && Array.isArray(r.strokes) && r.strokes.length && r.w && r.h) return { ...normaliseResult(r), w: r.w, h: r.h, imageName: r.imageName, hint: r.hint, variant: r.variant, at: r.at };
+    } catch {}
+    return null;
+  }
+
+  // ---------- Example (the house from the Sketch Lab poster, 10 strokes) ----------
+  const EXAMPLE = {
+    w: 1000, h: 1000, observation: '', landmarks: [], strokePlan: [],
+    strokes: [
+      { describes: 'house silhouette, walls and roof', points: [[150, 800], [150, 420], [500, 180], [850, 420], [850, 800]] },
+      { describes: 'ground line', points: [[150, 800], [500, 802], [850, 800]] },
+      { describes: 'eaves line', points: [[150, 420], [500, 421], [850, 420]] },
+      { describes: 'door', points: [[400, 800], [400, 580], [600, 580], [600, 800]] },
+      { describes: 'upper left window', points: [[250, 520], [340, 520], [340, 600], [250, 600], [250, 520]] },
+      { describes: 'upper right window', points: [[660, 520], [750, 520], [750, 600], [660, 600], [660, 520]] },
+      { describes: 'lower left window', points: [[250, 680], [340, 680], [340, 760], [250, 760], [250, 680]] },
+      { describes: 'lower right window', points: [[660, 680], [750, 680], [750, 760], [660, 760], [660, 680]] },
+      { describes: 'door split', points: [[500, 800], [500, 690], [500, 580]] },
+      { describes: 'gable vent', points: [[450, 280], [550, 280], [550, 380]] },
+    ],
+  };
+
+  // ---------- Boot ----------
+  const saved = loadLast();
+  state.result = saved ? { ...saved, source: 'saved' } : { ...EXAMPLE, source: 'example' };
+  state.marks = prepareMarks(state.result.strokes);
+  setSheetTag();
+  renderStatic();
+  setStatus('IDLE');
+  updateLogUi();
+
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (state.status === 'DRAWING' || !state.result) return;
+      renderStatic(); drawOverlay();
+    }, 150);
+  });
+
+  // ---------- Local engine settings (only outside Claude) ----------
+  const eng = {
+    box: $('engineBox'), sum: $('engineSummary'), tag: $('engineTag'),
+    url: $('srvUrl'), model: $('srvModel'), key: $('srvKey'), think: $('srvThink'),
+    test: $('srvTest'), reset: $('srvReset'), status: $('srvStatus'),
+  };
+  function shortModel(m) { return String(m || '').split('/').pop(); }
+  function syncEngineUi() {
+    eng.url.value = local.url; eng.model.value = local.model; eng.key.value = local.key; eng.think.checked = !!local.thinking;
+    eng.sum.textContent = `${shortModel(local.model)} · ${baseUrl()}${local.thinking ? ' · thinking on' : ''}`;
+    eng.tag.textContent = 'LOCAL · ' + shortModel(local.model).toUpperCase();
+  }
+  function saveLocal() {
+    local = { url: eng.url.value.trim(), model: eng.model.value.trim(), key: eng.key.value, thinking: eng.think.checked };
+    try { localStorage.setItem(LOCAL_KEY, JSON.stringify(local)); } catch {}
+    eng.sum.textContent = `${shortModel(local.model)} · ${baseUrl()}${local.thinking ? ' · thinking on' : ''}`;
+    eng.tag.textContent = 'LOCAL · ' + shortModel(local.model).toUpperCase();
+    eng.status.textContent = ''; eng.status.className = 'eng-status';
+    refreshControls();
+  }
+  [eng.url, eng.model, eng.key].forEach(i => i.addEventListener('change', saveLocal));
+  eng.think.addEventListener('change', saveLocal);
+  eng.reset.addEventListener('click', () => { local = { ...LOCAL_DEFAULTS }; syncEngineUi(); saveLocal(); });
+  eng.test.addEventListener('click', async () => {
+    saveLocal();
+    eng.status.className = 'eng-status'; eng.status.textContent = 'checking…';
+    eng.test.disabled = true;
+    try {
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000);
+      const r = await fetch(baseUrl() + '/models', { headers: authHeaders(), signal: ctl.signal });
+      clearTimeout(t);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = await r.json();
+      const ids = (j.data || []).map(m => m.id);
+      if (ids.includes(local.model)) { eng.status.className = 'eng-status ok'; eng.status.textContent = `connected · ${local.model} is loaded`; }
+      else { eng.status.className = 'eng-status bad'; eng.status.textContent = `connected, but ${local.model} is not loaded. The server has: ${ids.join(', ') || 'nothing'}`; }
+    } catch (e) {
+      eng.status.className = 'eng-status bad';
+      eng.status.textContent = `no answer from ${baseUrl()} (${e.name === 'AbortError' ? 'timed out' : (e.message || 'blocked')}). Is the server running?`;
+    } finally { eng.test.disabled = false; }
+  });
+
+  if (!IN_CLAUDE) {
+    eng.box.hidden = false;
+    let hasSaved = false;
+    try { hasSaved = !!localStorage.getItem(LOCAL_KEY); } catch {}
+    if (!hasSaved) eng.box.open = true;   // first visit: show where the model is set
+    syncEngineUi();
+    ui.saveGroup.hidden = false;
+    updateLogUi();
+    refreshControls();
+  }
+
+  // Capabilities light up when they resolve; the page works without them.
+  if (IN_CLAUDE) {
+    window.claude.use('sample').then(async s => {
+      if (!s) { ui.unavail.hidden = false; return; }
+      let lim = null;
+      try { lim = await s.limits(); } catch {}
+      if (!lim || !lim.images) { ui.unavail.hidden = false; ui.unavail.textContent = 'This view cannot send images to Claude, so DRAW is switched off. The example drawing and REPLAY still work.'; return; }
+      state.sample = s; state.canImages = true;
+      if (Array.isArray(lim.images.mediaTypes) && lim.images.mediaTypes.length) ui.file.accept = lim.images.mediaTypes.join(',');
+      refreshControls();
+    }).catch(() => { ui.unavail.hidden = false; });
+    window.claude.use('downloads').then(d => {
+      if (!d) return;
+      state.downloads = d; ui.saveGroup.hidden = false; refreshControls(); updateLogUi();
+    }).catch(() => {});
+  }
+})();
+</script>
